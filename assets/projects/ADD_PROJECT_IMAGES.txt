@@ -1,0 +1,1 @@
+Add project screenshots here and reference them from site-data.js, e.g. assets/projects/project-one.jpg.
