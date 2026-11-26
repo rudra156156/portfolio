@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Monte Carlo Project Schedule Risk Portal</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #f4f6f9;
+      --card: #ffffff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --primary: #1d4ed8;
+      --primary-hover: #1e40af;
+      --teal: #0d9488;
+      --amber: #d97706;
+      --red: #dc2626;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+    }
+    header {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 1.1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    header h1 { margin: 0; font-size: 1.25rem; font-weight: 700; }
+    header p { margin: 0.15rem 0 0; font-size: 0.85rem; color: #94a3b8; }
+    .container { max-width: 1380px; margin: 1.5rem auto; padding: 0 1.25rem; }
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 0.5rem;
+    }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      padding: 0.55rem 1.1rem;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      border-radius: 6px;
+    }
+    .tab-btn.active {
+      background: var(--primary);
+      color: #ffffff;
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.15rem 1.3rem;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+    }
+    .card h2 {
+      margin: 0 0 0.85rem;
+      font-size: 1.02rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .controls-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: flex-end;
+      margin-bottom: 1rem;
+    }
+    .field { display: flex; flex-direction: column; gap: 0.25rem; }
+    .field label { font-size: 0.78rem; font-weight: 600; color: var(--muted); }
+    .field input, .field select {
+      padding: 0.45rem 0.65rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      width: 135px;
+    }
+    button.run-btn {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 0.55rem 1.25rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.run-btn:hover { background: var(--primary-hover); }
+    button.run-btn:disabled { opacity: 0.6; cursor: wait; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 0.5rem 0.6rem;
+      border-bottom: 1px solid var(--border);
+    }
+    th { background: #f8fafc; font-weight: 700; color: #334155; }
+    td input[type="number"] {
+      width: 76px;
+      padding: 0.3rem 0.45rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+      gap: 0.9rem;
+      margin-bottom: 1.25rem;
+    }
+    .kpi {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--primary);
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+    }
+    .kpi.teal { border-left-color: var(--teal); }
+    .kpi.amber { border-left-color: var(--amber); }
+    .kpi.red { border-left-color: var(--red); }
+    .kpi .label { font-size: 0.76rem; font-weight: 600; color: var(--muted); text-transform: uppercase; }
+    .kpi .value { font-size: 1.32rem; font-weight: 800; margin-top: 0.2rem; color: #0f172a; }
+    .kpi .sub { font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; }
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+      gap: 1.25rem;
+    }
+    .chart-box { position: relative; height: 320px; width: 100%; }
+    .badge {
+      display: inline-block;
+      padding: 0.18rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: #ccfbf1;
+      color: #0f766e;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Monte Carlo Project Schedule Risk Simulator</h1>
+      <p>Triangular Durations + Compound Poisson–Lognormal Shocks | PERT/CPM Merge Bias | Crashing Pareto Frontier</p>
+    </div>
+    <div id="status-badge" style="font-size:0.84rem;color:#38bdf8;font-weight:600;">Ready</div>
+  </header>
+
+  <div class="container">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('tab-sim', this)">1. Schedule Risk &amp; PERT/CPM</button>
+      <button class="tab-btn" onclick="switchTab('tab-crash', this)">2. Schedule Crashing Pareto</button>
+      <button class="tab-btn" onclick="switchTab('tab-val', this)">3. Analytical Check &amp; LHS</button>
+    </div>
+
+    <!-- TAB 1: SCHEDULE RISK & NETWORK COMPARISON -->
+    <div id="tab-sim" class="tab-panel active">
+      <div class="card">
+        <h2>Simulation Parameters &amp; Work Package Inputs</h2>
+        <div class="controls-bar">
+          <div class="field">
+            <label>Monte Carlo Trials</label>
+            <select id="n_trials">
+              <option value="25000">25,000 trials</option>
+              <option value="50000">50,000 trials</option>
+              <option value="100000" selected>100,000 trials</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Target Deadline (Days)</label>
+            <input type="number" id="target_days" value="75" step="1" />
+          </div>
+          <div class="field">
+            <label>Random Seed</label>
+            <input type="number" id="seed" value="42" step="1" />
+          </div>
+          <button class="run-btn" id="btn-run-sim" onclick="runSimulation()">Run 100,000-Trial Simulation</button>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table id="wp-table">
+            <thead>
+              <tr>
+                <th>Work Package</th>
+                <th>Optimistic (a)</th>
+                <th>Most Likely (c)</th>
+                <th>Pessimistic (b)</th>
+                <th>Poisson Rate (&lambda;)</th>
+                <th>Delay Mean (d)</th>
+                <th>Delay Std (d)</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="kpi-grid" id="sim-kpis"></div>
+
+      <div class="charts-grid">
+        <div class="card">
+          <h2>Completion Time Density: Sequential vs. Parallel PERT/CPM</h2>
+          <div class="chart-box"><canvas id="chart-hist"></canvas></div>
+        </div>
+        <div class="card">
+          <h2>Cumulative Probability S-Curves (CDF)</h2>
+          <div class="chart-box"><canvas id="chart-cdf"></canvas></div>
+        </div>
+        <div class="card">
+          <h2>Work Package Sensitivity (Spearman &rho;)</h2>
+          <div class="chart-box"><canvas id="chart-tornado"></canvas></div>
+        </div>
+        <div class="card">
+          <h2>Sequential vs. Parallel PERT/CPM Summary</h2>
+          <table id="network-table">
+            <thead>
+              <tr>
+                <th>Risk Metric</th>
+                <th>Sequential</th>
+                <th>Parallel CPM</th>
+                <th>Savings / Delta</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <p id="merge-bias-note" style="font-size:0.84rem;color:#0f766e;font-weight:600;margin-top:0.85rem;"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: SCHEDULE CRASHING PARETO -->
+    <div id="tab-crash" class="tab-panel">
+      <div class="card">
+        <h2>Parallel PERT/CPM Crashing Parameters (WP3 Backend &amp; WP4 Frontend)</h2>
+        <div class="controls-bar">
+          <div class="field">
+            <label>WP3 Max Crash (Days)</label>
+            <input type="number" id="wp3_max" value="6" min="1" max="10" />
+          </div>
+          <div class="field">
+            <label>WP3 Cost / Day ($)</label>
+            <input type="number" id="wp3_cost" value="2500" step="100" />
+          </div>
+          <div class="field">
+            <label>WP4 Max Crash (Days)</label>
+            <input type="number" id="wp4_max" value="4" min="1" max="8" />
+          </div>
+          <div class="field">
+            <label>WP4 Cost / Day ($)</label>
+            <input type="number" id="wp4_cost" value="1800" step="100" />
+          </div>
+          <button class="run-btn" id="btn-run-crash" onclick="runCrashing()">Compute Pareto Frontier</button>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="card">
+          <h2>Cost vs. 95% VaR Pareto Efficient Frontier</h2>
+          <div class="chart-box"><canvas id="chart-pareto"></canvas></div>
+        </div>
+        <div class="card">
+          <h2>Pareto-Optimal Crashing Policies</h2>
+          <div style="overflow-x:auto;">
+            <table id="pareto-table">
+              <thead>
+                <tr>
+                  <th>Policy</th>
+                  <th>Cost ($)</th>
+                  <th>Mean (d)</th>
+                  <th>VaR 95%</th>
+                  <th>CVaR 95%</th>
+                  <th>P(&gt;Target)</th>
+                  <th>Path A Crit.</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: ANALYTICAL CHECK & LHS CONVERGENCE -->
+    <div id="tab-val" class="tab-panel">
+      <div class="card">
+        <h2>Closed-Form Gaussian Verification &amp; Latin Hypercube Variance Reduction</h2>
+        <div class="controls-bar">
+          <div class="field">
+            <label>Normal Threshold (Days)</label>
+            <input type="number" id="norm_thresh" value="65" step="1" />
+          </div>
+          <button class="run-btn" id="btn-run-val" onclick="runValidation()">Run Verification &amp; LHS Benchmark</button>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="card">
+          <h2>Independent Normal Analytical Check</h2>
+          <table id="val-table">
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th>Analytical Exact</th>
+                <th>Monte Carlo Sim</th>
+                <th>Absolute Error</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h2>Mean RMSE Convergence: Crude MC vs. Latin Hypercube</h2>
+          <div class="chart-box"><canvas id="chart-lhs"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const DEFAULT_PACKAGES = {{ default_packages | tojson }};
+    const charts = {};
+
+    function switchTab(tabId, btn) {
+      document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.getElementById(tabId).classList.add("active");
+      btn.classList.add("active");
+    }
+
+    function renderPackageTable() {
+      const tbody = document.querySelector("#wp-table tbody");
+      tbody.innerHTML = "";
+      DEFAULT_PACKAGES.forEach((wp, idx) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><strong>${wp.name}</strong></td>
+          <td><input type="number" step="0.5" data-idx="${idx}" data-field="optimistic" value="${wp.optimistic}"></td>
+          <td><input type="number" step="0.5" data-idx="${idx}" data-field="most_likely" value="${wp.most_likely}"></td>
+          <td><input type="number" step="0.5" data-idx="${idx}" data-field="pessimistic" value="${wp.pessimistic}"></td>
+          <td><input type="number" step="0.1" data-idx="${idx}" data-field="delay_rate" value="${wp.delay_rate}"></td>
+          <td><input type="number" step="0.1" data-idx="${idx}" data-field="delay_mean_days" value="${wp.delay_mean_days}"></td>
+          <td><input type="number" step="0.1" data-idx="${idx}" data-field="delay_std_days" value="${wp.delay_std_days}"></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function collectPackages() {
+      const copy = JSON.parse(JSON.stringify(DEFAULT_PACKAGES));
+      document.querySelectorAll("#wp-table input").forEach(inp => {
+        const idx = parseInt(inp.dataset.idx, 10);
+        const field = inp.dataset.field;
+        copy[idx][field] = parseFloat(inp.value);
+      });
+      return copy;
+    }
+
+    function destroyChart(id) {
+      if (charts[id]) { charts[id].destroy(); }
+    }
+
+    async function runSimulation() {
+      const btn = document.getElementById("btn-run-sim");
+      const badge = document.getElementById("status-badge");
+      btn.disabled = true;
+      badge.textContent = "Running Monte Carlo...";
+
+      const payload = {
+        packages: collectPackages(),
+        n_trials: parseInt(document.getElementById("n_trials").value, 10),
+        target_days: parseFloat(document.getElementById("target_days").value),
+        seed: parseInt(document.getElementById("seed").value, 10),
+      };
+
+      const res = await fetch("/api/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      const seq = data.sequential;
+      const par = data.network.parallel;
+      const mb = data.network.merge_bias;
+
+      document.getElementById("sim-kpis").innerHTML = `
+        <div class="kpi">
+          <div class="label">Sequential Mean</div>
+          <div class="value">${seq.mean.toFixed(2)} d</div>
+          <div class="sub">95% CI: [${seq.ci_95_mean[0].toFixed(2)}, ${seq.ci_95_mean[1].toFixed(2)}]</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Sequential Median (P50)</div>
+          <div class="value">${seq.median.toFixed(2)} d</div>
+          <div class="sub">Baseline Mode: ${seq.deterministic_baseline.toFixed(1)} d</div>
+        </div>
+        <div class="kpi amber">
+          <div class="label">Sequential VaR 95%</div>
+          <div class="value">${seq.var_95_total.toFixed(2)} d</div>
+          <div class="sub">CVaR 95%: ${seq.cvar_95_total.toFixed(2)} d</div>
+        </div>
+        <div class="kpi red">
+          <div class="label">P(Sequential &gt; ${seq.target_days}d)</div>
+          <div class="value">${(seq.prob_exceed_target * 100).toFixed(2)}%</div>
+          <div class="sub">Overrun VaR: +${seq.var_95_overrun_vs_target.toFixed(2)} d</div>
+        </div>
+        <div class="kpi teal">
+          <div class="label">Parallel PERT/CPM Mean</div>
+          <div class="value">${par.mean.toFixed(2)} d</div>
+          <div class="sub">Saves ${data.network.time_savings.mean_days.toFixed(2)} d vs. Seq</div>
+        </div>
+        <div class="kpi teal">
+          <div class="label">Parallel VaR 95%</div>
+          <div class="value">${par.p95.toFixed(2)} d</div>
+          <div class="sub">P(&gt;${seq.target_days}d): ${(par.prob_exceed_target * 100).toFixed(2)}%</div>
+        </div>
+      `;
+
+      // Histogram chart
+      destroyChart("hist");
+      charts["hist"] = new Chart(document.getElementById("chart-hist"), {
+        type: "line",
+        data: {
+          datasets: [
+            {
+              label: "Sequential Density",
+              data: data.sequential_curves.hist_x.map((x, i) => ({ x, y: data.sequential_curves.hist_y[i] })),
+              borderColor: "#1d4ed8",
+              backgroundColor: "rgba(29, 78, 216, 0.22)",
+              fill: true,
+              pointRadius: 0,
+              tension: 0.25,
+            },
+            {
+              label: "Parallel PERT/CPM Density",
+              data: data.parallel_curves.hist_x.map((x, i) => ({ x, y: data.parallel_curves.hist_y[i] })),
+              borderColor: "#0d9488",
+              backgroundColor: "rgba(13, 148, 136, 0.22)",
+              fill: true,
+              pointRadius: 0,
+              tension: 0.25,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { type: "linear", title: { display: true, text: "Completion Time (Days)" } },
+            y: { title: { display: true, text: "Probability Density" } },
+          },
+        },
+      });
+
+      // CDF chart
+      destroyChart("cdf");
+      charts["cdf"] = new Chart(document.getElementById("chart-cdf"), {
+        type: "line",
+        data: {
+          datasets: [
+            {
+              label: "Sequential S-Curve",
+              data: data.sequential_curves.cdf_x.map((x, i) => ({ x, y: data.sequential_curves.cdf_y[i] })),
+              borderColor: "#1d4ed8",
+              pointRadius: 0,
+              borderWidth: 2.2,
+            },
+            {
+              label: "Parallel PERT/CPM S-Curve",
+              data: data.parallel_curves.cdf_x.map((x, i) => ({ x, y: data.parallel_curves.cdf_y[i] })),
+              borderColor: "#0d9488",
+              pointRadius: 0,
+              borderWidth: 2.2,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { type: "linear", title: { display: true, text: "Completion Time (Days)" } },
+            y: { min: 0, max: 100, title: { display: true, text: "Cumulative Probability (%)" } },
+          },
+        },
+      });
+
+      // Tornado chart
+      const sensEntries = Object.entries(seq.spearman_sensitivity).sort((a, b) => b[1] - a[1]);
+      destroyChart("tornado");
+      charts["tornado"] = new Chart(document.getElementById("chart-tornado"), {
+        type: "bar",
+        data: {
+          labels: sensEntries.map(e => e[0]),
+          datasets: [{
+            label: "Spearman Rank Correlation (ρ)",
+            data: sensEntries.map(e => e[1]),
+            backgroundColor: "#2563eb",
+          }],
+        },
+        options: {
+          indexAxis: "y",
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { x: { min: 0, max: 1 } },
+        },
+      });
+
+      // Network comparison table
+      const netBody = document.querySelector("#network-table tbody");
+      const sav = data.network.time_savings;
+      netBody.innerHTML = `
+        <tr><td>Deterministic Mode</td><td>${seq.deterministic_baseline.toFixed(2)} d</td><td>${par.deterministic_baseline.toFixed(2)} d</td><td>-${sav.deterministic_days.toFixed(2)} d</td></tr>
+        <tr><td>Simulated Mean</td><td>${seq.mean.toFixed(2)} d</td><td>${par.mean.toFixed(2)} d</td><td>-${sav.mean_days.toFixed(2)} d</td></tr>
+        <tr><td>Median (P50)</td><td>${seq.median.toFixed(2)} d</td><td>${par.p50.toFixed(2)} d</td><td>-${sav.p50_days.toFixed(2)} d</td></tr>
+        <tr><td>95th Percentile (VaR)</td><td>${seq.var_95_total.toFixed(2)} d</td><td>${par.p95.toFixed(2)} d</td><td>-${sav.p95_days.toFixed(2)} d</td></tr>
+        <tr><td>CVaR 95% (Shortfall)</td><td>${seq.cvar_95_total.toFixed(2)} d</td><td>${par.cvar_95.toFixed(2)} d</td><td>-${sav.cvar_95_days.toFixed(2)} d</td></tr>
+        <tr><td>P(T &gt; ${seq.target_days}d)</td><td>${(seq.prob_exceed_target * 100).toFixed(2)}%</td><td>${(par.prob_exceed_target * 100).toFixed(2)}%</td><td>${((par.prob_exceed_target - seq.prob_exceed_target) * 100).toFixed(2)} pp</td></tr>
+      `;
+      document.getElementById("merge-bias-note").textContent =
+        `Parallel Merge Bias: Naive PERT Mean = ${mb.naive_pert_mean.toFixed(2)}d vs. Simulated Mean = ${mb.simulated_parallel_mean.toFixed(2)}d (+${mb.pure_merge_bias_days.toFixed(2)}d pure merge bias).`;
+
+      btn.disabled = false;
+      badge.textContent = `Completed (${payload.n_trials.toLocaleString()} trials)`;
+    }
+
+    async function runCrashing() {
+      const btn = document.getElementById("btn-run-crash");
+      btn.disabled = true;
+
+      const payload = {
+        packages: collectPackages(),
+        n_trials: Math.min(50000, parseInt(document.getElementById("n_trials").value, 10)),
+        target_days: parseFloat(document.getElementById("target_days").value),
+        seed: parseInt(document.getElementById("seed").value, 10),
+        wp3_max_crash: parseInt(document.getElementById("wp3_max").value, 10),
+        wp3_cost_per_day: parseFloat(document.getElementById("wp3_cost").value),
+        wp4_max_crash: parseInt(document.getElementById("wp4_max").value, 10),
+        wp4_cost_per_day: parseFloat(document.getElementById("wp4_cost").value),
+      };
+
+      const res = await fetch("/api/crashing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      const dominated = data.all_policies.filter(p => !p.is_pareto);
+      const pareto = data.pareto_frontier;
+
+      destroyChart("pareto");
+      charts["pareto"] = new Chart(document.getElementById("chart-pareto"), {
+        type: "scatter",
+        data: {
+          datasets: [
+            {
+              label: "Pareto Efficient Frontier",
+              data: pareto.map(p => ({ x: p.cost / 1000, y: p.var_95, label: p.label })),
+              borderColor: "#0d9488",
+              backgroundColor: "#0d9488",
+              showLine: true,
+              pointRadius: 6,
+            },
+            {
+              label: "Dominated Policies",
+              data: dominated.map(p => ({ x: p.cost / 1000, y: p.var_95, label: p.label })),
+              backgroundColor: "#94a3b8",
+              pointRadius: 4.5,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: ctx => `${ctx.raw.label}: $${ctx.raw.x.toFixed(1)}k | VaR 95%: ${ctx.raw.y.toFixed(2)}d`,
+              },
+            },
+          },
+          scales: {
+            x: { title: { display: true, text: "Crashing Budget ($ Thousands)" } },
+            y: { title: { display: true, text: "95% VaR Completion Time (Days)" } },
+          },
+        },
+      });
+
+      const tbody = document.querySelector("#pareto-table tbody");
+      tbody.innerHTML = pareto.map(p => `
+        <tr>
+          <td><span class="badge">${p.label}</span></td>
+          <td>$${p.cost.toLocaleString()}</td>
+          <td>${p.mean.toFixed(2)} d</td>
+          <td><strong>${p.var_95.toFixed(2)} d</strong></td>
+          <td>${p.cvar_95.toFixed(2)} d</td>
+          <td>${(p.prob_exceed_target * 100).toFixed(2)}%</td>
+          <td>${(p.branch_a_criticality * 100).toFixed(1)}%</td>
+        </tr>
+      `).join("");
+
+      btn.disabled = false;
+    }
+
+    async function runValidation() {
+      const btn = document.getElementById("btn-run-val");
+      btn.disabled = true;
+
+      const payload = {
+        packages: collectPackages(),
+        n_trials: Math.min(50000, parseInt(document.getElementById("n_trials").value, 10)),
+        target_days: parseFloat(document.getElementById("target_days").value),
+        threshold: parseFloat(document.getElementById("norm_thresh").value),
+        seed: parseInt(document.getElementById("seed").value, 10),
+      };
+
+      const res = await fetch("/api/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      const tbody = document.querySelector("#val-table tbody");
+      tbody.innerHTML = Object.entries(data.analytical.table).map(([metric, vals]) => `
+        <tr>
+          <td><strong>${metric}</strong></td>
+          <td>${vals.Analytical.toFixed(5)}</td>
+          <td>${vals.Simulated.toFixed(5)}</td>
+          <td>${vals.Abs_Error.toFixed(5)}</td>
+        </tr>
+      `).join("");
+
+      const conv = data.convergence;
+      destroyChart("lhs");
+      charts["lhs"] = new Chart(document.getElementById("chart-lhs"), {
+        type: "line",
+        data: {
+          labels: conv.sample_sizes.map(n => n.toLocaleString()),
+          datasets: [
+            {
+              label: "Crude Monte Carlo Mean RMSE (Days)",
+              data: conv.cmc.mean_rmse,
+              borderColor: "#1d4ed8",
+              tension: 0.2,
+            },
+            {
+              label: "Latin Hypercube (LHS) Mean RMSE (Days)",
+              data: conv.lhs.mean_rmse,
+              borderColor: "#d97706",
+              tension: 0.2,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { type: "logarithmic", title: { display: true, text: "Mean RMSE (Days, log)" } },
+          },
+        },
+      });
+
+      btn.disabled = false;
+    }
+
+    renderPackageTable();
+    window.addEventListener("DOMContentLoaded", () => {
+      runSimulation();
+      runCrashing();
+      runValidation();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{microtype}
+
+\DeclareMathOperator{\Var}{Var}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\I}{\mathbb{I}}
+
+\title{\textbf{Stochastic Schedule Risk Analysis via Monte Carlo Simulation:\\Mathematical Formulation, Network Merge Bias, and Crashing Optimization}}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Problem Formulation and Stochastic Network Structure}
+
+Consider a project decomposed into $N = 6$ sequential work packages indexed by $i \in \{1, 2, \dots, 6\}$. Under strictly sequential execution, the total project completion time $T$ is the sum of the realized durations $X_i$ of the individual work packages:
+\begin{equation}
+    T = \sum_{i=1}^{6} X_i, \quad \text{where } X_i = B_i + S_i.
+    \label{eq:total_duration}
+\end{equation}
+
+\section{Probability Distributions of Component Processes}
+
+\subsection{Baseline Work Package Duration}
+The nominal duration $B_i$ of work package $i$ follows a three-point Triangular distribution, $B_i \sim \mathrm{Triangular}(a_i, c_i, b_i)$, with PDF:
+\begin{equation}
+    f_{B_i}(x) = 
+    \begin{cases} 
+        \dfrac{2(x - a_i)}{(b_i - a_i)(c_i - a_i)}, & a_i \le x < c_i, \\[12pt]
+        \dfrac{2(b_i - x)}{(b_i - a_i)(b_i - c_i)}, & c_i \le x \le b_i, \\[12pt]
+        0, & \text{otherwise}.
+    \end{cases}
+    \label{eq:triangular_pdf}
+\end{equation}
+
+\subsection{Compound Poisson--Lognormal Delay Process}
+Discrete risk shocks are modeled as a compound Poisson process $S_i = \sum_{j=1}^{K_i} D_{i,j}$ ($S_i = 0$ if $K_i = 0$), where $K_i \sim \mathrm{Poisson}(\lambda_i)$ and $D_{i,j} \sim \mathrm{Lognormal}(\mu_i, \sigma_i^2)$:
+\begin{align}
+    \E[S_i] &= \lambda_i \exp\!\left(\mu_i + \frac{\sigma_i^2}{2}\right), \label{eq:compound_mean} \\
+    \Var(S_i) &= \lambda_i \exp\!\left(2\mu_i + 2\sigma_i^2\right). \label{eq:compound_var}
+\end{align}
+
+\section{Risk Metrics and Analytical Verification}
+From $M = 100{,}000$ independent trials $\{T^{(1)}, \dots, T^{(M)}\}$, we estimate the sample mean $\bar{T}$, asymptotic $95\%$ confidence interval $\bar{T} \pm 1.96 s_T / \sqrt{M}$, deadline exceedance probability $\hat{P}(T > 75)$, Schedule Value at Risk $\mathrm{VaR}_{0.95}(T)$, and Conditional Value at Risk $\mathrm{CVaR}_{0.95}(T) = \E[T \mid T \ge \mathrm{VaR}_{0.95}(T)]$.
+
+Numerical accuracy is verified against six independent Gaussian work packages $Y_i \sim \mathcal{N}(\mu_i, \sigma_i^2)$ whose exact sum satisfies $T_{\mathrm{norm}} \sim \mathcal{N}\!\left(\sum \mu_i, \sum \sigma_i^2\right)$.
+
+\section{Parallel PERT/CPM Topology and Schedule Crashing Optimization}
+Refactoring the network into two concurrent paths yields:
+\begin{equation}
+    T_{\mathrm{par}}^{(m)}(c_3, c_4) = X_1^{(m)} + \max\!\Big(X_2^{(m)} + X_3^{(m)}(c_3), \; X_4^{(m)}(c_4)\Big) + X_5^{(m)} + X_6^{(m)},
+\end{equation}
+where $X_i^{(m)}(c_i) = \left(\frac{m_i - c_i}{m_i}\right) B_i^{(m)} + S_i^{(m)}$ for $i \in \{3, 4\}$ and $C(c_3, c_4) = \kappa_3 c_3 + \kappa_4 c_4$. Policies are evaluated via Common Random Numbers (CRN) to extract the bi-objective Pareto efficient frontier minimizing $(C, \mathrm{VaR}_{0.95})$.
+
+\end{document}
